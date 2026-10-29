@@ -19,7 +19,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: mvn -B verify
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'target/watchtower-sdk-*.jar'
       - name: GitHub release
