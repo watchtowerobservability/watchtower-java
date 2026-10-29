@@ -1,0 +1,4 @@
+<configuration>
+  <appender name="WT" class="io.watchtower.logging.LogbackAppender"/>
+  <root level="INFO"><appender-ref ref="WT"/></root>
+</configuration>

@@ -1,0 +1,4 @@
+<Configuration packages="io.watchtower.logging">
+  <Appenders><Watchtower name="WT"/></Appenders>
+  <Loggers><Root level="info"><AppenderRef ref="WT"/></Root></Loggers>
+</Configuration>
