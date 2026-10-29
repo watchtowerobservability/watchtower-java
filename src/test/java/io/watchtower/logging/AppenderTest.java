@@ -31,7 +31,7 @@ class AppenderTest {
     sdk.getSdkLoggerProvider().forceFlush().join(5, TimeUnit.SECONDS);
     List<LogRecordData> out = mem.getFinishedLogRecordItems();
     assertEquals(1, out.size());
-    assertEquals("failed 7", out.get(0).getBodyValue().asString());
+    assertEquals("failed 7", out.get(0).getBody().asString());
     assertEquals(Severity.ERROR, out.get(0).getSeverity());
     assertEquals("kaboom", out.get(0).getAttributes()
         .get(io.opentelemetry.api.common.AttributeKey.stringKey("exception.message")));
