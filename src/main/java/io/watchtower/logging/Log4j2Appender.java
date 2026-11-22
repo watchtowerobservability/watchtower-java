@@ -34,6 +34,6 @@ public final class Log4j2Appender extends AbstractAppender {
 
   @Override public void append(LogEvent e) {
     WatchtowerLogs.emit(e.getLoggerName(), severity(e.getLevel()), e.getMessage().getFormattedMessage(),
-        e.getThrown(), e.getContextData().toMap(), e.getTimeMillis());
+        e.getThrown(), e.getContextData().toMap(), e.getTimeMillis(), e.getSource());
   }
 }

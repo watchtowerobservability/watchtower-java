@@ -12,6 +12,8 @@ public class WatchtowerProperties {
   private String environment;
   private String release;
   private boolean captureUncaught = true;
+  private Boolean remoteSampling;
+  private Boolean codeOrigin;
 
   public boolean isEnabled() { return enabled; }
   public void setEnabled(boolean v) { enabled = v; }
@@ -27,4 +29,10 @@ public class WatchtowerProperties {
   public void setRelease(String v) { release = v; }
   public boolean isCaptureUncaught() { return captureUncaught; }
   public void setCaptureUncaught(boolean v) { captureUncaught = v; }
+  /** Null: WT_REMOTE_SAMPLING decides (default off). */
+  public Boolean getRemoteSampling() { return remoteSampling; }
+  public void setRemoteSampling(Boolean v) { remoteSampling = v; }
+  /** Null: WT_CODE_ORIGIN decides (default off). */
+  public Boolean getCodeOrigin() { return codeOrigin; }
+  public void setCodeOrigin(Boolean v) { codeOrigin = v; }
 }

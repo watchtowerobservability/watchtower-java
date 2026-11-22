@@ -19,10 +19,17 @@ public class LogbackAppender extends AppenderBase<ILoggingEvent> {
     }
   }
 
+  /** The call site, only when the event already carries caller data (extracting it costs a stack walk). */
+  static StackTraceElement caller(ILoggingEvent e) {
+    if (!e.hasCallerData() && !Boolean.getBoolean("watchtower.log.caller")) return null; // -Dwatchtower.log.caller=true opts in
+    StackTraceElement[] c = e.getCallerData();
+    return c != null && c.length > 0 ? c[0] : null;
+  }
+
   @Override protected void append(ILoggingEvent e) {
     IThrowableProxy p = e.getThrowableProxy();
     Throwable t = p instanceof ThrowableProxy ? ((ThrowableProxy) p).getThrowable() : null;
     WatchtowerLogs.emit(e.getLoggerName(), severity(e.getLevel()), e.getFormattedMessage(), t,
-        e.getMDCPropertyMap(), e.getTimeStamp());
+        e.getMDCPropertyMap(), e.getTimeStamp(), caller(e));
   }
 }

@@ -1,6 +1,7 @@
 package io.watchtower.spring;
 
 import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.watchtower.PayloadCapture;
 import io.watchtower.Watchtower;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -22,10 +23,21 @@ public class WatchtowerAutoConfiguration {
   @Bean(destroyMethod = "close")
   @ConditionalOnMissingBean
   public OpenTelemetrySdk watchtowerOpenTelemetry(WatchtowerProperties p) {
-    OpenTelemetrySdk sdk = Watchtower.init(new Watchtower.Options()
+    Watchtower.Options o = new Watchtower.Options()
         .apiKey(p.getApiKey()).endpoint(p.getEndpoint()).serviceName(p.getService())
-        .environment(p.getEnvironment()).release(p.getRelease()));
+        .environment(p.getEnvironment()).release(p.getRelease());
+    if (p.getRemoteSampling() != null) o.remoteSampling(p.getRemoteSampling());
+    if (p.getCodeOrigin() != null) o.codeOrigin(p.getCodeOrigin());
+    OpenTelemetrySdk sdk = Watchtower.init(o);
     if (p.isCaptureUncaught()) Watchtower.installUncaughtHandler();
+    String key = p.getApiKey() != null ? p.getApiKey() : System.getenv("WT_INGEST_KEY");
+    if (key != null && "1".equals(System.getenv("WT_CAPTURE_RULES"))) {
+      String api = System.getenv("WT_API_URL") != null ? System.getenv("WT_API_URL") : Watchtower.endpoint(p.getEndpoint());
+      String service = p.getService() != null ? p.getService() : System.getenv().getOrDefault("WT_SERVICE", "app");
+      Thread t = new Thread(() -> PayloadCapture.load(api, key, service), "watchtower-capture-rules");
+      t.setDaemon(true);
+      t.start();
+    }
     return sdk;
   }
 
@@ -37,6 +49,12 @@ public class WatchtowerAutoConfiguration {
     @ConditionalOnMissingBean
     WatchtowerExceptionResolver watchtowerExceptionResolver() {
       return new WatchtowerExceptionResolver();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    WatchtowerPayloadFilter watchtowerPayloadFilter() {
+      return new WatchtowerPayloadFilter();
     }
   }
 }
