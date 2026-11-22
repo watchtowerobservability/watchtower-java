@@ -19,7 +19,7 @@
   </distributionManagement>
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
-    <otel.version>1.43.0</otel.version>
+    <otel.version>1.67.0</otel.version>
     <spring-boot.version>3.3.5</spring-boot.version>
     <log4j.version>2.24.1</log4j.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
