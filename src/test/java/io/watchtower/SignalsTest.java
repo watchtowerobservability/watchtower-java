@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
@@ -37,8 +38,14 @@ class SignalsTest {
   record Req(String path, String auth, byte[] body) {}
 
   static HttpServer otlp(List<Req> got, int port) throws Exception {
+    return otlp(got, port, new AtomicBoolean(true));
+  }
+
+  // While `online` is false the collector answers 503 and records nothing: an offline collector on a port that stays ours.
+  static HttpServer otlp(List<Req> got, int port, AtomicBoolean online) throws Exception {
     HttpServer srv = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
     srv.createContext("/", x -> {
+      if (!online.get()) { x.sendResponseHeaders(503, -1); x.close(); return; }
       got.add(new Req(x.getRequestURI().getPath(), x.getRequestHeaders().getFirst("Authorization"),
           x.getRequestBody().readAllBytes()));
       x.sendResponseHeaders(200, -1);
@@ -121,9 +128,10 @@ class SignalsTest {
 
   @Test
   void failedMetricBatchesAreSpooledAndReplayedToTheMetricsPath(@TempDir Path dir) throws Exception {
-    HttpServer probe = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    int port = probe.getAddress().getPort();
-    probe.stop(0);
+    List<Req> got = Collections.synchronizedList(new ArrayList<>());
+    AtomicBoolean online = new AtomicBoolean(false);
+    HttpServer srv = otlp(got, 0, online); // stays bound: rebinding a freed port races other tests
+    int port = srv.getAddress().getPort();
     Flaky inner = new Flaky();
     SpoolingMetricExporter spool = new SpoolingMetricExporter(inner, dir, "http://127.0.0.1:" + port + "/v1/metrics",
         Map.of("Authorization", "Bearer k"), 500);
@@ -132,9 +140,8 @@ class SignalsTest {
     counter.add(1);
     mp.forceFlush().join(10, TimeUnit.SECONDS);
     assertEquals(1, spool.files().size());
-    List<Req> got = Collections.synchronizedList(new ArrayList<>());
-    HttpServer srv = otlp(got, port);
     try {
+      online.set(true);
       inner.down = false;
       counter.add(1);
       mp.forceFlush().join(10, TimeUnit.SECONDS);
