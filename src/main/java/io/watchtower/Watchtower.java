@@ -8,7 +8,11 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.exporter.otlp.http.logs.OtlpHttpLogRecordExporter;
 import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporter;
 import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
-import io.opentelemetry.instrumentation.runtimemetrics.java8.RuntimeMetrics;
+import io.opentelemetry.instrumentation.runtimemetrics.java8.Classes;
+import io.opentelemetry.instrumentation.runtimemetrics.java8.Cpu;
+import io.opentelemetry.instrumentation.runtimemetrics.java8.GarbageCollector;
+import io.opentelemetry.instrumentation.runtimemetrics.java8.MemoryPools;
+import io.opentelemetry.instrumentation.runtimemetrics.java8.Threads;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.logs.SdkLoggerProvider;
 import io.opentelemetry.sdk.logs.export.BatchLogRecordProcessor;
@@ -24,6 +28,8 @@ import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -34,7 +40,7 @@ public final class Watchtower {
   public static final String DEFAULT_ENDPOINT = "http://localhost:4318";
 
   private static volatile OpenTelemetrySdk current;
-  private static volatile RuntimeMetrics runtime;
+  private static volatile List<AutoCloseable> runtime = List.of();
   private static volatile io.watchtower.profiling.WatchtowerProfiler profiler;
   private static volatile RemoteSampler sampler;
 
@@ -233,11 +239,20 @@ public final class Watchtower {
       }
       mpb.registerMetricReader(PeriodicMetricReader.builder(mex).setInterval(Duration.ofMillis(exportInterval())).build());
     }
-    RuntimeMetrics prev = runtime;
-    if (prev != null) prev.close(); // a re-init replaces the previous SDK's observers
+    for (AutoCloseable c : runtime) { // a re-init replaces the previous SDK's observers
+      try { c.close(); } catch (Exception ignored) { /* best effort */ }
+    }
     current = OpenTelemetrySdk.builder().setTracerProvider(tp).setLoggerProvider(lpb.build())
         .setMeterProvider(mpb.build()).build();
-    runtime = metricsOn ? RuntimeMetrics.create(current) : null; // GC, memory, threads, classes, CPU
+    List<AutoCloseable> obs = new ArrayList<>(); // GC, memory, threads, classes, CPU (2.9.0-alpha has no RuntimeMetrics facade)
+    if (metricsOn) {
+      obs.addAll(Classes.registerObservers(current));
+      obs.addAll(Cpu.registerObservers(current));
+      obs.addAll(GarbageCollector.registerObservers(current));
+      obs.addAll(MemoryPools.registerObservers(current));
+      obs.addAll(Threads.registerObservers(current));
+    }
+    runtime = obs;
     io.watchtower.profiling.WatchtowerProfiler oldProfiler = profiler;
     if (oldProfiler != null) oldProfiler.close();
     profiler = null;
